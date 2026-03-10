@@ -8,31 +8,28 @@ import { roomStore } from '../stores/RoomStore';
 const CreateRoom = observer(() => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
 
   const onFinish = async (values: any) => {
-    setLoading(true);
     try {
       const { roomName, ownerName, ownerPassword, tasks } = values;
 
-      // Создаём комнату
-      const room = roomStore.createRoom(
+      // Создаём комнату через WebSocket
+      await roomStore.createRoom(
         roomName,
         ownerName,
         ownerPassword,
         tasks || []
       );
 
-      // Устанавливаем текущего пользователя
-      roomStore.setCurrentUser(room.id, room.ownerId, true);
-
       message.success('Комната создана успешно!');
-      navigate(`/room/${room.id}/voting`);
+
+      // Перенаправляем в комнату
+      if (roomStore.currentRoom) {
+        navigate(`/room/${roomStore.currentRoom.id}`);
+      }
     } catch (error) {
-      message.error('Ошибка при создании комнаты');
+      message.error(error instanceof Error ? error.message : 'Ошибка при создании комнаты');
       console.error(error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -108,7 +105,7 @@ const CreateRoom = observer(() => {
           </Form.List>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block size="large">
+            <Button type="primary" htmlType="submit" loading={roomStore.isLoading} block size="large">
               Создать комнату
             </Button>
           </Form.Item>
