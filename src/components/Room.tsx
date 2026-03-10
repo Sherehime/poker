@@ -197,7 +197,7 @@ const Room = observer(() => {
           </Card>
         )}
 
-        {/* Список задач */}
+        {/* Список задач - только для Owner и только когда нет активного голосования */}
         {currentUser.isOwner && !currentVotingSession && (
           <Card title="📋 Задачи для оценки">
             <List

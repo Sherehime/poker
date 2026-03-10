@@ -138,6 +138,9 @@ export class RoomStore {
     this.error = null;
 
     try {
+      // Переустанавливаем слушатели перед подключением
+      this.setupSocketListeners();
+      
       const response = await socketService.joinRoom({
         roomId,
         name: userName,
