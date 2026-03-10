@@ -8,7 +8,7 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-export default function Layout({ children }: LayoutProps) {
+  export default function Layout({ children }: LayoutProps) {
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
       <Header style={{ 
@@ -27,8 +27,7 @@ export default function Layout({ children }: LayoutProps) {
           padding: '24px', 
           borderRadius: '8px',
           boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-          maxWidth: '1200px',
-          margin: '0 auto',
+          width: '100%',
         }}>
           {children}
         </div>

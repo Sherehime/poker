@@ -27,7 +27,9 @@ export interface VotingSession {
   votes: Vote[];
   finalEstimate?: VoteValue;
   createdAt: Date;
+  startedAt?: Date;
   completedAt?: Date;
+  duration?: number; // в секундах
 }
 
 export interface Room {

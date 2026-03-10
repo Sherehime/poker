@@ -68,6 +68,7 @@ export async function handleStartVoting(
       status: sessionData.status as 'active' | 'completed',
       finalEstimate: sessionData.final_estimate,
       createdAt: new Date(sessionData.created_at),
+      startedAt: sessionData.started_at ? new Date(sessionData.started_at) : undefined,
       completedAt: sessionData.completed_at ? new Date(sessionData.completed_at) : undefined,
     };
 
@@ -158,6 +159,11 @@ export async function handleCompleteVoting(
       return socket.emit('error', { error: 'Не все участники проголосовали' });
     }
 
+    // Вычисляем длительность голосования
+    const startedAt = sessionData.started_at ? new Date(sessionData.started_at) : new Date(sessionData.created_at);
+    const completedAt = new Date();
+    const duration = Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000); // в секундах
+
     // Вычисляем итоговую оценку
     const numericVotes = votes
       .map(v => v.value)
@@ -179,7 +185,7 @@ export async function handleCompleteVoting(
     }
 
     // Обновляем сессию
-    db.completeSession(sessionData.id, finalEstimate.toString());
+    db.completeSession(sessionData.id, finalEstimate.toString(), duration);
 
     // Формируем ответ
     const completedSession = {
@@ -189,7 +195,9 @@ export async function handleCompleteVoting(
       status: 'completed' as const,
       finalEstimate,
       createdAt: new Date(sessionData.created_at),
+      startedAt: sessionData.started_at ? new Date(sessionData.started_at) : new Date(sessionData.created_at),
       completedAt: new Date(),
+      duration,
     };
 
     const response = {
