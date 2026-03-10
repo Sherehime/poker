@@ -12,11 +12,11 @@ export class RoomStore {
 
   constructor() {
     makeAutoObservable(this);
-    this.setupSocketListeners();
   }
 
   // Настройка слушателей WebSocket событий
-  private setupSocketListeners() {
+  setupSocketListeners() {
+    console.log('🔧 Setting up socket listeners in RoomStore');
     socketService.onParticipantJoined((participant) => {
       runInAction(() => {
         if (this.currentRoom) {
@@ -60,8 +60,10 @@ export class RoomStore {
     });
 
         socketService.onVotingCompleted((data) => {
+      console.log('📨 Received voting:completed event', data);
       runInAction(() => {
-        this.currentVotingSession = {
+        // Создаём завершённую сессию для истории
+        const completedSession = {
           id: data.session.id,
           taskId: data.session.taskId,
           status: data.session.status,
@@ -78,9 +80,18 @@ export class RoomStore {
         };
 
         // Добавляем в историю
-        if (this.currentVotingSession) {
-          this.votingHistory.unshift(this.currentVotingSession);
-        }
+        this.votingHistory.unshift(completedSession);
+        
+        // Очищаем текущую сессию чтобы можно было запускать новые голосования
+        this.currentVotingSession = null;
+        
+        console.log('✅ Voting completed, session cleared, history updated');
+      });
+    });
+
+    socketService.onVotingCancelled(() => {
+      runInAction(() => {
+        this.currentVotingSession = null;
       });
     });
 
@@ -95,6 +106,9 @@ export class RoomStore {
   async createRoom(name: string, ownerName: string, ownerPassword: string, tasks: Omit<Task, 'id'>[]): Promise<void> {
     this.isLoading = true;
     this.error = null;
+
+    console.log('🏠 Creating room - setting up socket listeners');
+    this.setupSocketListeners();
 
     try {
       const response = await socketService.createRoom({
@@ -139,8 +153,10 @@ export class RoomStore {
     this.isLoading = true;
     this.error = null;
 
+    console.log('🚪 Joining room - setting up socket listeners');
+    this.setupSocketListeners();
+
     try {
-      // Слушатели уже установлены в constructor()
       
       const response = await socketService.joinRoom({
         roomId,
@@ -254,6 +270,17 @@ export class RoomStore {
     }
 
     socketService.completeVoting({
+      roomId: this.currentRoom.id,
+    });
+  }
+
+  // Отменить голосование
+  cancelVoting() {
+    if (!this.currentRoom || !this.currentUser?.isOwner) {
+      throw new Error('Только owner может отменять голосование');
+    }
+
+    socketService.cancelVoting({
       roomId: this.currentRoom.id,
     });
   }

@@ -9,6 +9,7 @@ import type {
   StartVotingRequest,
   CastVoteRequest,
   CompleteVotingRequest,
+  CancelVotingRequest,
 } from '../../server/types.js';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
@@ -115,6 +116,12 @@ class SocketService {
     socket.emit('voting:complete', data);
   }
 
+  // Отмена голосования
+  cancelVoting(data: CancelVotingRequest) {
+    const socket = this.getSocket();
+    socket.emit('voting:cancel', data);
+  }
+
   // Подписка на события сервера
 
   onRoomUpdated(callback: (room: any) => void) {
@@ -138,6 +145,7 @@ class SocketService {
   }
 
   onVotingStarted(callback: (session: any) => void) {
+    console.log('🔌 Registering onVotingStarted listener');
     const socket = this.getSocket();
     const oldCallback = this.listeners.get('voting:started');
     if (oldCallback) {
@@ -170,6 +178,16 @@ class SocketService {
     }
     this.listeners.set('voting:completed', callback);
     socket.on('voting:completed', callback);
+  }
+
+  onVotingCancelled(callback: (data: { sessionId: string; taskId: string }) => void) {
+    const socket = this.getSocket();
+    const oldCallback = this.listeners.get('voting:cancelled');
+    if (oldCallback) {
+      socket.off('voting:cancelled', oldCallback as any);
+    }
+    this.listeners.set('voting:cancelled', callback);
+    socket.on('voting:cancelled', callback);
   }
 
   onError(callback: (error: any) => void) {
