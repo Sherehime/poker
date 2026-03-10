@@ -1,0 +1,166 @@
+### Linux ###
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+### Windows ###
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+### User-specific stuff ###
+.idea/
+*.iws
+*.iml
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+lib-cov
+*.lcov
+node_modules/
+*.tsbuildinfo
+.npm
+.eslintcache
+*.sublime-work/*
+.histomp/
+
+###  ###
+npm-debug.log
+package-lock.json
+
+### Nuxt build ###
+.nuxt
+
+### Nuxt generate ###
+dist
+tmp-files
+*.local.ts
+
+### Project-specific stuff ###
+target
+project/target/*
+.scannerwork/
+null/
+/.classpath
+/.settings
+/.cache
+/.target
+idea_modules
+.bsp
+build
+**/.gradle
+project/project
+.metals
+.bloop
+.vscode
+.env
+project/metals.sbt
+Dockerfile.local
+tmp/
+
+.idea
+.metals
+.code
+target
+.bloop
+.bsp
+*.log
+**/target/
+**/logs/
+ui/client/.env
+.vscode/settings.json
+metals.sbt
+.sbtopts
+
+*.un~
+.vault
+infrastructure/ansible/nkc-is/.vault
+
+# Конфиги и секреты
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+*.env.backup
+
+# Конфигурации с ключами/паролями
+config/*.secret.*
+config/secrets/
+credentials/
+*.pem
+*.key
+*.cert
+*.crt
+*.jks
+*.conf
+*.ini
+**/*.conf
+**/*.ini
+
+# Базы данных, кэш и другие чувствительные директории
+data/
+postgres_data/
+mysql_data/
+*.sqlite
+*.db
+*.mdb
+
+# Логи и временные файлы с потенциально чувствительной инфой
+logs/
+*.log
+temp/
+
+# Фронтенд
+node_modules/
+dist/
+build/
+.vite/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.db
+*.sqlite
+*.sqlite3
+*.log
+npm-debug.log*
+.eslintcache
+.cache/
+.env
+.env.*
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+public/
+src/assets/

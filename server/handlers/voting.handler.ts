@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-import { StartVotingRequest, CastVoteRequest, CompleteVotingRequest } from '../types.js';
+import { StartVotingRequest, CastVoteRequest, CompleteVotingRequest, CancelVotingRequest } from '../types.js';
 import * as db from '../db.js';
 
 // Числа Фибоначчи для покер-планирования
@@ -61,6 +61,8 @@ export async function handleStartVoting(
       return socket.emit('error', { error: 'Не удалось создать сессию голосования' });
     }
 
+    console.log('📦 sessionData from DB:', JSON.stringify(sessionData, null, 2));
+
     const session = {
       id: sessionData.id,
       roomId: sessionData.room_id,
@@ -72,7 +74,14 @@ export async function handleStartVoting(
       completedAt: sessionData.completed_at ? new Date(sessionData.completed_at) : undefined,
     };
 
-    console.log('🚀 Emitting voting:started to room', data.roomId, session);
+    console.log('🚀 Emitting voting:started to room', data.roomId);
+    console.log('  Session object:', JSON.stringify(session, null, 2));
+    
+    // Проверяем кто в комнате
+    const room = io.sockets.adapter.rooms.get(data.roomId);
+    console.log('👥 Participants in room:', room ? room.size : 0, 'sockets');
+    const socketsInRoom = room ? Array.from(room) : [];
+    console.log('🔌 Socket IDs in room:', socketsInRoom);
     
     // Оповещаем всех участников о старте голосования
     io.to(data.roomId).emit('voting:started', session);
@@ -221,5 +230,38 @@ export async function handleCompleteVoting(
   } catch (error) {
     console.error('Error completing voting:', error);
     socket.emit('error', { error: 'Failed to complete voting' });
+  }
+}
+
+// Обработчик отмены голосования
+export async function handleCancelVoting(
+  socket: Socket,
+  data: CancelVotingRequest,
+  io: any
+) {
+  try {
+    // Проверяем, что пользователь является owner
+    if (!socket.data.isOwner) {
+      return socket.emit('error', { error: 'Только owner может отменять голосование' });
+    }
+
+    // Проверяем существование активной сессии
+    const sessionData = db.getActiveSession(data.roomId);
+    if (!sessionData) {
+      return socket.emit('error', { error: 'Нет активного голосования' });
+    }
+
+    // Отменяем сессию
+    db.cancelSession(sessionData.id);
+
+    // Оповещаем всех об отмене голосования
+    io.to(data.roomId).emit('voting:cancelled', {
+      sessionId: sessionData.id,
+      taskId: sessionData.task_id,
+    });
+    console.log(`Голосование отменено в комнате ${data.roomId}`);
+  } catch (error) {
+    console.error('Error cancelling voting:', error);
+    socket.emit('error', { error: 'Failed to cancel voting' });
   }
 }

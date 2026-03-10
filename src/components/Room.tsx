@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Typography, Alert, Space, List, Button, Tag, Statistic, Row, Col, message, Descriptions, Tooltip, Input } from 'antd';
-import { PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, CopyOutlined, LogoutOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, CopyOutlined, LogoutOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { roomStore } from '../stores/RoomStore';
 import VotingCards from './VotingCards';
@@ -50,10 +50,13 @@ const Room = observer(() => {
   };
 
   const handleStartVoting = (taskId: string) => {
+    console.log('🚀 handleStartVoting called', { taskId, currentVotingSession });
     try {
       roomStore.startVoting(taskId);
       message.success('Голосование запущено!');
+      console.log('✅ startVoting succeeded');
     } catch (error) {
+      console.error('❌ startVoting error', error);
       message.error(error instanceof Error ? error.message : 'Ошибка при запуске голосования');
     }
   };
@@ -64,6 +67,15 @@ const Room = observer(() => {
       message.success('Голосование завершено!');
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Ошибка при завершении голосования');
+    }
+  };
+
+  const handleCancelVoting = () => {
+    try {
+      roomStore.cancelVoting();
+      message.success('Голосование отменено!');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Ошибка при отмене голосования');
     }
   };
 
@@ -153,14 +165,26 @@ const Room = observer(() => {
                   startedAt={currentVotingSession.startedAt} 
                   isRunning={true} 
                 />
-                {currentUser.isOwner && allVoted && (
-                  <Button 
-                    type="primary" 
-                    icon={<CheckCircleOutlined />}
-                    onClick={handleCompleteVoting}
-                  >
-                    Раскрыть карты
-                  </Button>
+                {currentUser.isOwner && (
+                  <>
+                    {allVoted ? (
+                      <Button 
+                        type="primary" 
+                        icon={<CheckCircleOutlined />}
+                        onClick={handleCompleteVoting}
+                      >
+                        Раскрыть карты
+                      </Button>
+                    ) : (
+                      <Button 
+                        danger
+                        icon={<CloseCircleOutlined />}
+                        onClick={handleCancelVoting}
+                      >
+                        Отменить голосование
+                      </Button>
+                    )}
+                  </>
                 )}
               </Space>
             }
@@ -186,9 +210,34 @@ const Room = observer(() => {
           </Card>
         )}
 
-        {/* Результаты голосования (после завершения) */}
+        {/* Результаты последнего голосования */}
         {!currentVotingSession && currentRoom.votingHistory.length > 0 && (
-          <Card title="📊 Последнее голосование">
+          <Card 
+            title={
+              <Space>
+                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                <span>Последнее голосование завершено</span>
+              </Space>
+            }
+          >
+            <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="Задача">
+                {currentRoom.tasks.find(t => t.id === currentRoom.votingHistory[0].taskId)?.title || 'Неизвестно'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Итоговая оценка">
+                <Tag color="green" style={{ fontSize: '16px', padding: '4px 12px' }}>
+                  {currentRoom.votingHistory[0].finalEstimate === '?' 
+                    ? 'Не определено' 
+                    : currentRoom.votingHistory[0].finalEstimate}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Длительность">
+                {currentRoom.votingHistory[0].duration 
+                  ? `${currentRoom.votingHistory[0].duration} сек.` 
+                  : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+            
             <VotingResults 
               votes={currentRoom.votingHistory[0].votes}
               showCards={true}

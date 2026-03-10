@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io';
 import { handleCreateRoom, handleJoinRoom, handleLeaveRoom } from './room.handler.js';
-import { handleStartVoting, handleCastVote, handleCompleteVoting } from './voting.handler.js';
+import { handleStartVoting, handleCastVote, handleCompleteVoting, handleCancelVoting } from './voting.handler.js';
 
 export function registerHandlers(io: any, socket: Socket) {
   // Обработчики комнат
@@ -27,6 +27,10 @@ export function registerHandlers(io: any, socket: Socket) {
 
   socket.on('voting:complete', (data: any) => {
     handleCompleteVoting(socket, data, io);
+  });
+
+  socket.on('voting:cancel', (data: any) => {
+    handleCancelVoting(socket, data, io);
   });
 
   // Обработка отключения

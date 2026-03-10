@@ -122,9 +122,17 @@ export function dbGet<T>(sql: string, params: any[] = []): T | null {
   if (!db) throw new Error('Database not initialized');
   const stmt = db.prepare(sql);
   stmt.bind(params);
+  
+  // Проверяем есть ли результат
+  if (!stmt.step()) {
+    stmt.free();
+    return null;
+  }
+  
+  // Получаем данные сразу после step() - курсор уже на нужной строке
   const result = stmt.getAsObject() as T;
   stmt.free();
-  return result || null;
+  return result;
 }
 
 export function dbAll<T>(sql: string, params: any[] = []): T[] {
@@ -209,14 +217,21 @@ export function createVotingSession(session: {
   roomId: string;
   taskId: string;
 }) {
+  console.log('🆕 createVotingSession:', session.id, 'room:', session.roomId, 'task:', session.taskId);
   dbRun(
     'INSERT INTO voting_sessions (id, room_id, task_id, status, started_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
     [session.id, session.roomId, session.taskId, 'active']
   );
+  console.log('✅ Voting session created in DB');
 }
 
 export function getActiveSession(roomId: string) {
-  return dbGet<any>('SELECT * FROM voting_sessions WHERE room_id = ? AND status = ?', [roomId, 'active']);
+  const session = dbGet<any>('SELECT * FROM voting_sessions WHERE room_id = ? AND status = ?', [roomId, 'active']);
+  console.log('🔍 getActiveSession for room', roomId, ':', session ? 'FOUND' : 'NULL');
+  if (session) {
+    console.log('  Session:', session.id, 'task:', session.task_id, 'status:', session.status);
+  }
+  return session;
 }
 
 export function getCompletedSessions(roomId: string) {
@@ -234,6 +249,13 @@ export function completeSession(sessionId: string, finalEstimate: string, durati
   dbRun(
     'UPDATE voting_sessions SET status = ?, final_estimate = ?, completed_at = CURRENT_TIMESTAMP, duration = ? WHERE id = ?',
     ['completed', finalEstimate, duration, sessionId]
+  );
+}
+
+export function cancelSession(sessionId: string) {
+  dbRun(
+    'UPDATE voting_sessions SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?',
+    ['cancelled', sessionId]
   );
 }
 

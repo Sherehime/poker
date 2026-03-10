@@ -81,6 +81,10 @@ export interface CompleteVotingRequest {
   roomId: string;
 }
 
+export interface CancelVotingRequest {
+  roomId: string;
+}
+
 // Ответы сервера
 export interface CreateRoomResponse {
   room: Room;
@@ -121,6 +125,7 @@ export type ServerToClientEvents = {
     votes: Vote[];
     finalEstimate: number | '?';
   }) => void;
+  'voting:cancelled': (data: { sessionId: string; taskId: string }) => void;
   'error': (data: ErrorResponse) => void;
 };
 
@@ -131,4 +136,5 @@ export type ClientToServerEvents = {
   'voting:start': (data: StartVotingRequest) => void;
   'vote:cast': (data: CastVoteRequest) => void;
   'voting:complete': (data: CompleteVotingRequest) => void;
+  'voting:cancel': (data: CancelVotingRequest) => void;
 };
