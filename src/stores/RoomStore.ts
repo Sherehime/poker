@@ -29,6 +29,7 @@ export class RoomStore {
     });
 
     socketService.onVotingStarted((session) => {
+      console.log('📨 Received voting:started event', session);
       runInAction(() => {
         this.currentVotingSession = {
           id: session.id,
@@ -39,6 +40,7 @@ export class RoomStore {
           startedAt: session.startedAt,
           completedAt: session.completedAt,
         };
+        console.log('✅ currentVotingSession set', this.currentVotingSession);
       });
     });
 
@@ -138,8 +140,7 @@ export class RoomStore {
     this.error = null;
 
     try {
-      // Переустанавливаем слушатели перед подключением
-      this.setupSocketListeners();
+      // Слушатели уже установлены в constructor()
       
       const response = await socketService.joinRoom({
         roomId,

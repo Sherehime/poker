@@ -15,6 +15,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 class SocketService {
   private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+  private listeners: Map<string, Function> = new Map();
 
   // Подключение к серверу
   connect() {
@@ -118,25 +119,42 @@ class SocketService {
 
   onRoomUpdated(callback: (room: any) => void) {
     const socket = this.getSocket();
-    socket.off('room:updated'); // Удаляем старый слушатель
+    const oldCallback = this.listeners.get('room:updated');
+    if (oldCallback) {
+      socket.off('room:updated', oldCallback as any);
+    }
+    this.listeners.set('room:updated', callback);
     socket.on('room:updated', callback);
   }
 
   onParticipantJoined(callback: (participant: any) => void) {
     const socket = this.getSocket();
-    socket.off('participant:joined'); // Удаляем старый слушатель
+    const oldCallback = this.listeners.get('participant:joined');
+    if (oldCallback) {
+      socket.off('participant:joined', oldCallback as any);
+    }
+    this.listeners.set('participant:joined', callback);
     socket.on('participant:joined', callback);
   }
 
   onVotingStarted(callback: (session: any) => void) {
     const socket = this.getSocket();
-    socket.off('voting:started'); // Удаляем старый слушатель
+    const oldCallback = this.listeners.get('voting:started');
+    if (oldCallback) {
+      socket.off('voting:started', oldCallback as any);
+    }
+    this.listeners.set('voting:started', callback);
     socket.on('voting:started', callback);
+    console.log('✅ onVotingStarted registered');
   }
 
   onVoteReceived(callback: (vote: { userId: string; userName: string }) => void) {
     const socket = this.getSocket();
-    socket.off('vote:received'); // Удаляем старый слушатель
+    const oldCallback = this.listeners.get('vote:received');
+    if (oldCallback) {
+      socket.off('vote:received', oldCallback as any);
+    }
+    this.listeners.set('vote:received', callback);
     socket.on('vote:received', callback);
   }
 
@@ -146,19 +164,28 @@ class SocketService {
     finalEstimate: number | '?';
   }) => void) {
     const socket = this.getSocket();
-    socket.off('voting:completed'); // Удаляем старый слушатель
+    const oldCallback = this.listeners.get('voting:completed');
+    if (oldCallback) {
+      socket.off('voting:completed', oldCallback as any);
+    }
+    this.listeners.set('voting:completed', callback);
     socket.on('voting:completed', callback);
   }
 
   onError(callback: (error: any) => void) {
     const socket = this.getSocket();
-    socket.off('error'); // Удаляем старый слушатель
+    const oldCallback = this.listeners.get('error');
+    if (oldCallback) {
+      socket.off('error', oldCallback as any);
+    }
+    this.listeners.set('error', callback);
     socket.on('error', callback);
   }
 
   // Отписка от событий
   removeAllListeners() {
     const socket = this.getSocket();
+    this.listeners.clear();
     socket.removeAllListeners();
   }
 }

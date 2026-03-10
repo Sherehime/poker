@@ -72,9 +72,11 @@ export async function handleStartVoting(
       completedAt: sessionData.completed_at ? new Date(sessionData.completed_at) : undefined,
     };
 
+    console.log('🚀 Emitting voting:started to room', data.roomId, session);
+    
     // Оповещаем всех участников о старте голосования
     io.to(data.roomId).emit('voting:started', session);
-    console.log(`Голосование запущено в комнате ${data.roomId} для задачи ${data.taskId}`);
+    console.log(`✅ Голосование запущено в комнате ${data.roomId} для задачи ${data.taskId}`);
   } catch (error) {
     console.error('Error starting voting:', error);
     socket.emit('error', { error: 'Failed to start voting' });
