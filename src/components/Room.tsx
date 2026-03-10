@@ -197,29 +197,48 @@ const Room = observer(() => {
           </Card>
         )}
 
-        {/* Список задач - только для Owner и только когда нет активного голосования */}
-        {currentUser.isOwner && !currentVotingSession && (
+        {/* Список задач - для Owner всегда */}
+        {currentUser.isOwner && (
           <Card title="📋 Задачи для оценки">
             <List
               dataSource={currentRoom.tasks}
-              renderItem={(task) => (
-                <List.Item
-                  actions={[
-                    <Button
-                      type="primary"
-                      icon={<PlayCircleOutlined />}
-                      onClick={() => handleStartVoting(task.id)}
-                    >
-                      Запустить голосование
-                    </Button>
-                  ]}
-                >
-                  <List.Item.Meta
-                    title={task.title}
-                    description={task.description || 'Без описания'}
-                  />
-                </List.Item>
-              )}
+              renderItem={(task) => {
+                const isVoting = currentVotingSession?.taskId === task.id;
+                const hasActiveVoting = !!currentVotingSession;
+                
+                return (
+                  <List.Item
+                    style={{
+                      backgroundColor: isVoting ? '#e6f7ff' : 'transparent',
+                      border: isVoting ? '2px solid #1890ff' : 'none'
+                    }}
+                    actions={[
+                      isVoting ? (
+                        <Tag color="processing" icon={<ClockCircleOutlined />}>
+                          🔄 Голосование запущено
+                        </Tag>
+                      ) : hasActiveVoting ? (
+                        <Button disabled>
+                          Заблокировано
+                        </Button>
+                      ) : (
+                        <Button
+                          type="primary"
+                          icon={<PlayCircleOutlined />}
+                          onClick={() => handleStartVoting(task.id)}
+                        >
+                          Запустить голосование
+                        </Button>
+                      )
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={task.title}
+                      description={task.description || 'Без описания'}
+                    />
+                  </List.Item>
+                );
+              }}
             />
           </Card>
         )}

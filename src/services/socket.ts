@@ -118,21 +118,25 @@ class SocketService {
 
   onRoomUpdated(callback: (room: any) => void) {
     const socket = this.getSocket();
+    socket.off('room:updated'); // Удаляем старый слушатель
     socket.on('room:updated', callback);
   }
 
   onParticipantJoined(callback: (participant: any) => void) {
     const socket = this.getSocket();
+    socket.off('participant:joined'); // Удаляем старый слушатель
     socket.on('participant:joined', callback);
   }
 
   onVotingStarted(callback: (session: any) => void) {
     const socket = this.getSocket();
+    socket.off('voting:started'); // Удаляем старый слушатель
     socket.on('voting:started', callback);
   }
 
   onVoteReceived(callback: (vote: { userId: string; userName: string }) => void) {
     const socket = this.getSocket();
+    socket.off('vote:received'); // Удаляем старый слушатель
     socket.on('vote:received', callback);
   }
 
@@ -142,11 +146,13 @@ class SocketService {
     finalEstimate: number | '?';
   }) => void) {
     const socket = this.getSocket();
+    socket.off('voting:completed'); // Удаляем старый слушатель
     socket.on('voting:completed', callback);
   }
 
   onError(callback: (error: any) => void) {
     const socket = this.getSocket();
+    socket.off('error'); // Удаляем старый слушатель
     socket.on('error', callback);
   }
 
