@@ -29,6 +29,7 @@ export class RoomStore {
     });
 
     socketService.onVotingStarted((session) => {
+      console.log('📨 Received voting:started event', session);
       runInAction(() => {
         this.currentVotingSession = {
           id: session.id,
@@ -36,7 +37,10 @@ export class RoomStore {
           status: session.status,
           votes: [],
           createdAt: session.createdAt,
+          startedAt: session.startedAt,
+          completedAt: session.completedAt,
         };
+        console.log('✅ currentVotingSession set', this.currentVotingSession);
       });
     });
 
@@ -68,7 +72,9 @@ export class RoomStore {
           })),
           finalEstimate: data.finalEstimate as VoteValue,
           createdAt: data.session.createdAt,
+          startedAt: data.session.startedAt,
           completedAt: data.session.completedAt,
+          duration: data.session.duration,
         };
 
         // Добавляем в историю
@@ -134,6 +140,8 @@ export class RoomStore {
     this.error = null;
 
     try {
+      // Слушатели уже установлены в constructor()
+      
       const response = await socketService.joinRoom({
         roomId,
         name: userName,
@@ -160,11 +168,13 @@ export class RoomStore {
             votes: h.votes.map(v => ({
               userId: v.userId,
               userName: v.userName,
-              value: (v.value === '?' ? '?' : parseFloat(v.value)) as VoteValue,
+              value: (v.value === '?' ? '?' : v.value) as VoteValue,
             })),
             finalEstimate: h.session.finalEstimate as VoteValue,
             createdAt: h.session.createdAt,
+            startedAt: h.session.startedAt,
             completedAt: h.session.completedAt,
+            duration: h.session.duration,
           })),
         };
 
@@ -178,6 +188,8 @@ export class RoomStore {
             status: response.currentSession.status,
             votes: [],
             createdAt: response.currentSession.createdAt,
+            startedAt: response.currentSession.startedAt,
+            completedAt: response.currentSession.completedAt,
           };
         }
 

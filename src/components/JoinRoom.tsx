@@ -45,7 +45,7 @@ const JoinRoom = observer(() => {
   };
 
   return (
-    <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '700px', margin: '0 auto' }}>
       <Card title="Вход в комнату">
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>

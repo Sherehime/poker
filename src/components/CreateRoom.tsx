@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { Form, Input, Button, Card, message, Space, Divider } from 'antd';
 import { PlusOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { roomStore } from '../stores/RoomStore';
 
-const CreateRoom = observer(() => {
+  const CreateRoom = observer(() => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
 
@@ -34,7 +33,7 @@ const CreateRoom = observer(() => {
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
       <Card title="Создать комнату для покер-планирования">
         <Form
           form={form}

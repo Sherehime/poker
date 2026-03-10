@@ -32,7 +32,9 @@ export interface VotingSession {
   status: 'active' | 'completed';
   finalEstimate?: number | '?';
   createdAt: Date;
+  startedAt?: Date;
   completedAt?: Date;
+  duration?: number; // в секундах
 }
 
 export interface Vote {

@@ -68,12 +68,15 @@ export async function handleStartVoting(
       status: sessionData.status as 'active' | 'completed',
       finalEstimate: sessionData.final_estimate,
       createdAt: new Date(sessionData.created_at),
+      startedAt: sessionData.started_at ? new Date(sessionData.started_at) : undefined,
       completedAt: sessionData.completed_at ? new Date(sessionData.completed_at) : undefined,
     };
 
+    console.log('🚀 Emitting voting:started to room', data.roomId, session);
+    
     // Оповещаем всех участников о старте голосования
     io.to(data.roomId).emit('voting:started', session);
-    console.log(`Голосование запущено в комнате ${data.roomId} для задачи ${data.taskId}`);
+    console.log(`✅ Голосование запущено в комнате ${data.roomId} для задачи ${data.taskId}`);
   } catch (error) {
     console.error('Error starting voting:', error);
     socket.emit('error', { error: 'Failed to start voting' });
@@ -158,6 +161,11 @@ export async function handleCompleteVoting(
       return socket.emit('error', { error: 'Не все участники проголосовали' });
     }
 
+    // Вычисляем длительность голосования
+    const startedAt = sessionData.started_at ? new Date(sessionData.started_at) : new Date(sessionData.created_at);
+    const completedAt = new Date();
+    const duration = Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000); // в секундах
+
     // Вычисляем итоговую оценку
     const numericVotes = votes
       .map(v => v.value)
@@ -179,7 +187,7 @@ export async function handleCompleteVoting(
     }
 
     // Обновляем сессию
-    db.completeSession(sessionData.id, finalEstimate.toString());
+    db.completeSession(sessionData.id, finalEstimate.toString(), duration);
 
     // Формируем ответ
     const completedSession = {
@@ -189,7 +197,9 @@ export async function handleCompleteVoting(
       status: 'completed' as const,
       finalEstimate,
       createdAt: new Date(sessionData.created_at),
+      startedAt: sessionData.started_at ? new Date(sessionData.started_at) : new Date(sessionData.created_at),
       completedAt: new Date(),
+      duration,
     };
 
     const response = {

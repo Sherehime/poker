@@ -1,5 +1,5 @@
 import { List, Tag, Card, Typography, Empty, Space } from 'antd';
-import { HistoryOutlined } from '@ant-design/icons';
+import { HistoryOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { Room, Task } from '../types';
 
 const { Text } = Typography;
@@ -14,6 +14,7 @@ interface TaskWithVotes {
     finalEstimate: number | '?';
     date: Date;
     participantCount: number;
+    duration?: number;
   }>;
 }
 
@@ -27,6 +28,14 @@ const History = ({ room }: HistoryProps) => {
     );
   }
 
+  // Форматирование длительности
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}м ${secs}с`;
+  };
+
   // Группируем сессии по задачам
   const tasksWithVotes: TaskWithVotes[] = room.tasks.map(task => ({
     task,
@@ -36,6 +45,7 @@ const History = ({ room }: HistoryProps) => {
         finalEstimate: session.finalEstimate || '?',
         date: new Date(session.createdAt),
         participantCount: session.votes.length,
+        duration: session.duration,
       })),
   })).filter(item => item.sessions.length > 0);
 
@@ -60,10 +70,24 @@ const History = ({ room }: HistoryProps) => {
                     </Space>
                   }
                   description={
-                    <Text type="secondary">
-                      {session.date.toLocaleString('ru-RU')} • 
-                      {session.participantCount} участников
-                    </Text>
+                    <Space>
+                      <Text type="secondary">
+                        {session.date.toLocaleString('ru-RU')}
+                      </Text>
+                      <Text type="secondary">•</Text>
+                      <Text type="secondary">
+                        {session.participantCount} участников
+                      </Text>
+                      {session.duration !== undefined && (
+                        <>
+                          <Text type="secondary">•</Text>
+                          <Space size={4}>
+                            <ClockCircleOutlined />
+                            <Text type="secondary">{formatDuration(session.duration)}</Text>
+                          </Space>
+                        </>
+                      )}
+                    </Space>
                   }
                 />
               </List.Item>

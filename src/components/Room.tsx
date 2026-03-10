@@ -1,19 +1,18 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Typography, Alert, Space, List, Button, Tag, Divider, Statistic, Row, Col, message, Descriptions, Tooltip, Input } from 'antd';
+import { Card, Typography, Alert, Space, List, Button, Tag, Statistic, Row, Col, message, Descriptions, Tooltip, Input } from 'antd';
 import { PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, CopyOutlined, LogoutOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { roomStore } from '../stores/RoomStore';
 import VotingCards from './VotingCards';
 import VotingResults from './VotingResults';
 import History from './History';
+import Timer from './Timer';
 
 const { Title, Text } = Typography;
 
 const Room = observer(() => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   // Если комнаты нет в сторе, пытаемся загрузить
   if (!roomStore.currentRoom && roomId) {
@@ -53,7 +52,6 @@ const Room = observer(() => {
   const handleStartVoting = (taskId: string) => {
     try {
       roomStore.startVoting(taskId);
-      setSelectedTaskId(taskId);
       message.success('Голосование запущено!');
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Ошибка при запуске голосования');
@@ -64,7 +62,6 @@ const Room = observer(() => {
     try {
       roomStore.completeVoting();
       message.success('Голосование завершено!');
-      setSelectedTaskId(null);
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Ошибка при завершении голосования');
     }
@@ -151,15 +148,21 @@ const Room = observer(() => {
               </Space>
             }
             extra={
-              currentUser.isOwner && allVoted && (
-                <Button 
-                  type="primary" 
-                  icon={<CheckCircleOutlined />}
-                  onClick={handleCompleteVoting}
-                >
-                  Раскрыть карты
-                </Button>
-              )
+              <Space>
+                <Timer 
+                  startedAt={currentVotingSession.startedAt} 
+                  isRunning={true} 
+                />
+                {currentUser.isOwner && allVoted && (
+                  <Button 
+                    type="primary" 
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleCompleteVoting}
+                  >
+                    Раскрыть карты
+                  </Button>
+                )}
+              </Space>
             }
           >
             <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
@@ -179,9 +182,7 @@ const Room = observer(() => {
               </Descriptions.Item>
             </Descriptions>
 
-            {!currentUser.isOwner && (
-              <VotingCards taskId={currentTask.id} />
-            )}
+            <VotingCards taskId={currentTask.id} />
           </Card>
         )}
 
@@ -196,29 +197,48 @@ const Room = observer(() => {
           </Card>
         )}
 
-        {/* Список задач */}
-        {currentUser.isOwner && !currentVotingSession && (
+        {/* Список задач - для Owner всегда */}
+        {currentUser.isOwner && (
           <Card title="📋 Задачи для оценки">
             <List
               dataSource={currentRoom.tasks}
-              renderItem={(task) => (
-                <List.Item
-                  actions={[
-                    <Button
-                      type="primary"
-                      icon={<PlayCircleOutlined />}
-                      onClick={() => handleStartVoting(task.id)}
-                    >
-                      Запустить голосование
-                    </Button>
-                  ]}
-                >
-                  <List.Item.Meta
-                    title={task.title}
-                    description={task.description || 'Без описания'}
-                  />
-                </List.Item>
-              )}
+              renderItem={(task) => {
+                const isVoting = currentVotingSession?.taskId === task.id;
+                const hasActiveVoting = !!currentVotingSession;
+                
+                return (
+                  <List.Item
+                    style={{
+                      backgroundColor: isVoting ? '#e6f7ff' : 'transparent',
+                      border: isVoting ? '2px solid #1890ff' : 'none'
+                    }}
+                    actions={[
+                      isVoting ? (
+                        <Tag color="processing" icon={<ClockCircleOutlined />}>
+                          🔄 Голосование запущено
+                        </Tag>
+                      ) : hasActiveVoting ? (
+                        <Button disabled>
+                          Заблокировано
+                        </Button>
+                      ) : (
+                        <Button
+                          type="primary"
+                          icon={<PlayCircleOutlined />}
+                          onClick={() => handleStartVoting(task.id)}
+                        >
+                          Запустить голосование
+                        </Button>
+                      )
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={task.title}
+                      description={task.description || 'Без описания'}
+                    />
+                  </List.Item>
+                );
+              }}
             />
           </Card>
         )}

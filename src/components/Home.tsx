@@ -4,11 +4,11 @@ import { useNavigate } from 'react-router-dom';
 
 const { Title, Paragraph } = Typography;
 
-const Home = () => {
+  const Home = () => {
   const navigate = useNavigate();
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+    <div style={{ maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
       <Card>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>

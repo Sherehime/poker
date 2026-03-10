@@ -137,7 +137,9 @@ export async function handleJoinRoom(
             session: {
               ...session,
               createdAt: new Date(session.created_at),
+              startedAt: session.started_at ? new Date(session.started_at) : undefined,
               completedAt: session.completed_at ? new Date(session.completed_at) : undefined,
+              duration: session.duration,
             },
             votes,
           };
@@ -220,7 +222,9 @@ export async function handleJoinRoom(
           session: {
             ...session,
             createdAt: new Date(session.created_at),
+            startedAt: session.started_at ? new Date(session.started_at) : undefined,
             completedAt: session.completed_at ? new Date(session.completed_at) : undefined,
+            duration: session.duration,
           },
           votes,
         };

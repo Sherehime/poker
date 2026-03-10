@@ -78,7 +78,9 @@ function createTables(database: Database) {
       status TEXT DEFAULT 'active',
       final_estimate TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      started_at DATETIME,
       completed_at DATETIME,
+      duration INTEGER,
       FOREIGN KEY (room_id) REFERENCES rooms(id),
       FOREIGN KEY (task_id) REFERENCES tasks(id)
     )
@@ -208,7 +210,7 @@ export function createVotingSession(session: {
   taskId: string;
 }) {
   dbRun(
-    'INSERT INTO voting_sessions (id, room_id, task_id, status) VALUES (?, ?, ?, ?)',
+    'INSERT INTO voting_sessions (id, room_id, task_id, status, started_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
     [session.id, session.roomId, session.taskId, 'active']
   );
 }
@@ -221,10 +223,17 @@ export function getCompletedSessions(roomId: string) {
   return dbAll<any>('SELECT * FROM voting_sessions WHERE room_id = ? AND status = ? ORDER BY completed_at DESC', [roomId, 'completed']);
 }
 
-export function completeSession(sessionId: string, finalEstimate: string) {
+export function startSession(sessionId: string) {
   dbRun(
-    'UPDATE voting_sessions SET status = ?, final_estimate = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?',
-    ['completed', finalEstimate, sessionId]
+    'UPDATE voting_sessions SET started_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [sessionId]
+  );
+}
+
+export function completeSession(sessionId: string, finalEstimate: string, duration: number) {
+  dbRun(
+    'UPDATE voting_sessions SET status = ?, final_estimate = ?, completed_at = CURRENT_TIMESTAMP, duration = ? WHERE id = ?',
+    ['completed', finalEstimate, duration, sessionId]
   );
 }
 
