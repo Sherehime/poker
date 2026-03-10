@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Typography, Alert, Space, List, Button, Tag, Divider, Statistic, Row, Col, message, Descriptions, Tooltip, Input } from 'antd';
-import { PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, CopyOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, CopyOutlined, LogoutOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { roomStore } from '../stores/RoomStore';
 import VotingCards from './VotingCards';
@@ -10,7 +11,27 @@ import History from './History';
 const { Title, Text } = Typography;
 
 const Room = observer(() => {
+  const { roomId } = useParams<{ roomId: string }>();
+  const navigate = useNavigate();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  // Если комнаты нет в сторе, пытаемся загрузить
+  if (!roomStore.currentRoom && roomId) {
+    // Показываем сообщение, что нужно войти
+    return (
+      <Alert
+        message="Необходимо войти в комнату"
+        description="Пожалуйста, пройдите по ссылке-приглашению"
+        type="warning"
+        showIcon
+        action={
+          <Button onClick={() => navigate(`/join/${roomId}`)}>
+            Войти в комнату
+          </Button>
+        }
+      />
+    );
+  }
 
   if (!roomStore.currentRoom || !roomStore.currentUser) {
     return (
@@ -23,32 +44,61 @@ const Room = observer(() => {
     );
   }
 
-  const { currentRoom, currentUser } = roomStore;
-  const currentSession = currentRoom.currentVotingSession;
+  const handleLeaveRoom = () => {
+    roomStore.leaveRoom();
+    navigate('/');
+    message.success('Вы покинули комнату');
+  };
 
   const handleStartVoting = (taskId: string) => {
-    roomStore.createVotingSession(taskId);
-    setSelectedTaskId(taskId);
-    message.success('Голосование запущено!');
+    try {
+      roomStore.startVoting(taskId);
+      setSelectedTaskId(taskId);
+      message.success('Голосование запущено!');
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Ошибка при запуске голосования');
+    }
   };
 
   const handleCompleteVoting = () => {
-    roomStore.completeVoting();
-    message.success('Голосование завершено!');
-    setSelectedTaskId(null);
+    try {
+      roomStore.completeVoting();
+      message.success('Голосование завершено!');
+      setSelectedTaskId(null);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Ошибка при завершении голосования');
+    }
   };
 
-  const currentTask = currentSession 
-    ? currentRoom.tasks.find(t => t.id === currentSession.taskId)
+  const handleCopyInviteLink = () => {
+    const link = roomStore.getInviteLink();
+    navigator.clipboard.writeText(link);
+    message.success('Ссылка скопирована в буфер обмена!');
+  };
+
+  const { currentRoom, currentUser, currentVotingSession } = roomStore;
+
+  const currentTask = currentVotingSession 
+    ? currentRoom.tasks.find(t => t.id === currentVotingSession.taskId)
     : null;
 
-  const allVoted = currentSession && currentSession.votes.length === currentRoom.participants.length;
+  const allVoted = currentVotingSession && currentVotingSession.votes.length === currentRoom.participants.length;
 
   return (
     <div>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Заголовок комнаты */}
-        <Card>
+        <Card
+          extra={
+            <Button 
+              icon={<LogoutOutlined />}
+              onClick={handleLeaveRoom}
+              danger
+            >
+              Покинуть комнату
+            </Button>
+          }
+        >
           <Row gutter={16}>
             <Col span={16}>
               <Title level={2} style={{ margin: 0 }}>{currentRoom.name}</Title>
@@ -74,17 +124,14 @@ const Room = observer(() => {
                 🔗 Ссылка для приглашения участников:
               </Text>
               <Input
-                value={`${window.location.origin}/room/${currentRoom.id}`}
+                value={roomStore.getInviteLink()}
                 readOnly
                 addonAfter={
                   <Tooltip title="Скопировать ссылку">
                     <Button
                       type="text"
                       icon={<CopyOutlined />}
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/room/${currentRoom.id}`);
-                        message.success('Ссылка скопирована в буфер обмена!');
-                      }}
+                      onClick={handleCopyInviteLink}
                     />
                   </Tooltip>
                 }
@@ -95,7 +142,7 @@ const Room = observer(() => {
         </Card>
 
         {/* Активное голосование */}
-        {currentSession && currentTask && (
+        {currentVotingSession && currentTask && (
           <Card 
             title={
               <Space>
@@ -121,7 +168,7 @@ const Room = observer(() => {
                 {currentTask.description || 'Нет описания'}
               </Descriptions.Item>
               <Descriptions.Item label="Проголосовали">
-                {currentSession.votes.length} / {currentRoom.participants.length}
+                {currentVotingSession.votes.length} / {currentRoom.participants.length}
               </Descriptions.Item>
               <Descriptions.Item label="Статус">
                 {allVoted ? (
@@ -132,27 +179,25 @@ const Room = observer(() => {
               </Descriptions.Item>
             </Descriptions>
 
-            {currentUser.isOwner ? (
-              <VotingResults votes={currentSession.votes} showCards={false} />
-            ) : (
+            {!currentUser.isOwner && (
               <VotingCards taskId={currentTask.id} />
             )}
           </Card>
         )}
 
         {/* Результаты голосования (после завершения) */}
-        {!currentSession && currentRoom.votingHistory.length > 0 && (
+        {!currentVotingSession && currentRoom.votingHistory.length > 0 && (
           <Card title="📊 Последнее голосование">
             <VotingResults 
-              votes={currentRoom.votingHistory[currentRoom.votingHistory.length - 1].votes}
+              votes={currentRoom.votingHistory[0].votes}
               showCards={true}
-              finalEstimate={currentRoom.votingHistory[currentRoom.votingHistory.length - 1].finalEstimate}
+              finalEstimate={currentRoom.votingHistory[0].finalEstimate}
             />
           </Card>
         )}
 
         {/* Список задач */}
-        {currentUser.isOwner && !currentSession && (
+        {currentUser.isOwner && !currentVotingSession && (
           <Card title="📋 Задачи для оценки">
             <List
               dataSource={currentRoom.tasks}
@@ -179,7 +224,7 @@ const Room = observer(() => {
         )}
 
         {/* Для участников - сообщение */}
-        {!currentUser.isOwner && !currentSession && (
+        {!currentUser.isOwner && !currentVotingSession && (
           <Alert
             message="Ожидание"
             description="Owner ещё не запустил голосование. Пожалуйста, подождите."
@@ -204,7 +249,7 @@ const Room = observer(() => {
                 <Space>
                   {participant.isOwner && <Tag color="gold">👑 Owner</Tag>}
                   <Text strong>{participant.name}</Text>
-                  {currentSession && currentSession.votes.find(v => v.userId === participant.id) && (
+                  {currentVotingSession && currentVotingSession.votes.find(v => v.userId === participant.id) && (
                     <Tag color="green">✓ Проголосовал</Tag>
                   )}
                 </Space>

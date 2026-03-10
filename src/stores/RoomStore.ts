@@ -1,195 +1,262 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import { v4 as uuidv4 } from 'uuid';
-import type { Room, User, Task, VotingSession } from '../types';
-import { storage } from '../utils/storage';
+import { socketService } from '../services/socket';
+import type { Room, User, Task, VotingSession, VoteValue } from '../types';
 
 export class RoomStore {
-  rooms: Room[] = [];
   currentRoom: Room | null = null;
   currentUser: User | null = null;
+  currentVotingSession: VotingSession | null = null;
+  votingHistory: VotingSession[] = [];
+  isLoading: boolean = false;
+  error: string | null = null;
 
   constructor() {
     makeAutoObservable(this);
-    this.loadFromStorage();
+    this.setupSocketListeners();
   }
 
-  // Загрузка данных из localStorage
-  private loadFromStorage() {
-    runInAction(() => {
-      this.rooms = storage.getRooms();
-      const currentUserData = storage.getCurrentUser();
-      
-      if (currentUserData) {
-        const room = this.getRoomById(currentUserData.roomId);
-        if (room) {
-          this.currentRoom = room;
-          const user = room.participants.find(p => p.id === currentUserData.userId);
-          if (user) {
-            this.currentUser = user;
+  // Настройка слушателей WebSocket событий
+  private setupSocketListeners() {
+    socketService.onParticipantJoined((participant) => {
+      runInAction(() => {
+        if (this.currentRoom) {
+          const exists = this.currentRoom.participants.find(p => p.id === participant.id);
+          if (!exists) {
+            this.currentRoom.participants.push(participant);
           }
         }
-      }
+      });
+    });
+
+    socketService.onVotingStarted((session) => {
+      runInAction(() => {
+        this.currentVotingSession = {
+          id: session.id,
+          taskId: session.taskId,
+          status: session.status,
+          votes: [],
+          createdAt: session.createdAt,
+        };
+      });
+    });
+
+    socketService.onVoteReceived((vote) => {
+      runInAction(() => {
+        if (this.currentVotingSession) {
+          const existingVote = this.currentVotingSession.votes.find(v => v.userId === vote.userId);
+          if (!existingVote) {
+            this.currentVotingSession.votes.push({
+              userId: vote.userId,
+              userName: vote.userName,
+              value: '?', // Скрываем значение до завершения
+            });
+          }
+        }
+      });
+    });
+
+        socketService.onVotingCompleted((data) => {
+      runInAction(() => {
+        this.currentVotingSession = {
+          id: data.session.id,
+          taskId: data.session.taskId,
+          status: data.session.status,
+          votes: data.votes.map(v => ({
+            userId: v.userId,
+            userName: v.userName,
+            value: v.value as VoteValue,
+          })),
+          finalEstimate: data.finalEstimate as VoteValue,
+          createdAt: data.session.createdAt,
+          completedAt: data.session.completedAt,
+        };
+
+        // Добавляем в историю
+        if (this.currentVotingSession) {
+          this.votingHistory.unshift(this.currentVotingSession);
+        }
+      });
+    });
+
+    socketService.onError((error) => {
+      runInAction(() => {
+        this.error = error.message || 'Произошла ошибка';
+      });
     });
   }
 
-  // Получить комнату по ID
-  getRoomById(roomId: string): Room | undefined {
-    return this.rooms.find(room => room.id === roomId);
-  }
+  // Создать новую комнату через WebSocket
+  async createRoom(name: string, ownerName: string, ownerPassword: string, tasks: Omit<Task, 'id'>[]): Promise<void> {
+    this.isLoading = true;
+    this.error = null;
 
-  // Создать новую комнату
-  createRoom(name: string, ownerName: string, ownerPassword: string, tasks: Omit<Task, 'id'>[]): Room {
-    const roomId = uuidv4();
-    const ownerId = uuidv4();
-    
-    const room: Room = {
-      id: roomId,
-      name,
-      ownerId,
-      ownerPassword, // TODO: хэшировать пароль
-      tasks: tasks.map(task => ({ ...task, id: uuidv4() })),
-      votingHistory: [],
-      participants: [{
-        id: ownerId,
-        name: ownerName,
-        isOwner: true,
-      }],
-    };
+    try {
+      const response = await socketService.createRoom({
+        name,
+        ownerName,
+        ownerPassword,
+        tasks: tasks.map(t => ({
+          title: t.title,
+          description: t.description,
+        })),
+      });
 
-    runInAction(() => {
-      this.rooms.push(room);
-      storage.saveRooms(this.rooms);
-    });
+      runInAction(() => {
+        this.currentRoom = {
+          id: response.roomId,
+          name: response.room.name,
+          ownerId: response.room.ownerId,
+          ownerPassword: response.room.ownerPassword,
+          tasks: response.tasks.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description || '',
+          })),
+          participants: [response.user],
+          votingHistory: [],
+        };
 
-    return room;
-  }
-
-  // Присоединиться к комнате как участник
-  joinRoom(roomId: string, userName: string): Room | null {
-    const room = this.getRoomById(roomId);
-    if (!room) return null;
-
-    if (room.participants.length >= 10) {
-      throw new Error('Максимум 10 участников в комнате');
+        this.currentUser = response.user;
+        this.isLoading = false;
+      });
+    } catch (err) {
+      runInAction(() => {
+        this.error = err instanceof Error ? err.message : 'Не удалось создать комнату';
+        this.isLoading = false;
+      });
+      throw err;
     }
-
-    const newUser: User = {
-      id: uuidv4(),
-      name: userName,
-      isOwner: false,
-    };
-
-    runInAction(() => {
-      room.participants.push(newUser);
-      storage.saveRooms(this.rooms);
-    });
-
-    return room;
   }
 
-  // Проверить пароль Owner
-  verifyOwnerPassword(roomId: string, password: string): boolean {
-    const room = this.getRoomById(roomId);
-    return room ? room.ownerPassword === password : false;
-  }
+  // Присоединиться к комнате через WebSocket
+  async joinRoom(roomId: string, userName: string, isOwner: boolean = false, password?: string): Promise<void> {
+    this.isLoading = true;
+    this.error = null;
 
-  // Установить текущего пользователя
-  setCurrentUser(roomId: string, userId: string, isOwner: boolean) {
-    const room = this.getRoomById(roomId);
-    if (!room) return;
+    try {
+      const response = await socketService.joinRoom({
+        roomId,
+        name: userName,
+        isOwner,
+        password,
+      });
 
-    const user = room.participants.find(p => p.id === userId);
-    if (!user) return;
+      runInAction(() => {
+        this.currentRoom = {
+          id: response.room.id,
+          name: response.room.name,
+          ownerId: response.room.ownerId,
+          ownerPassword: response.room.ownerPassword,
+          tasks: response.tasks.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description || '',
+          })),
+          participants: response.participants,
+          votingHistory: response.votingHistory.map(h => ({
+            id: h.session.id,
+            taskId: h.session.taskId,
+            status: h.session.status,
+            votes: h.votes.map(v => ({
+              userId: v.userId,
+              userName: v.userName,
+              value: (v.value === '?' ? '?' : parseFloat(v.value)) as VoteValue,
+            })),
+            finalEstimate: h.session.finalEstimate as VoteValue,
+            createdAt: h.session.createdAt,
+            completedAt: h.session.completedAt,
+          })),
+        };
 
-    runInAction(() => {
-      this.currentRoom = room;
-      this.currentUser = user;
-      storage.saveCurrentUser(roomId, userId, isOwner);
-    });
+        this.currentUser = response.user;
+        this.votingHistory = this.currentRoom.votingHistory;
+
+        if (response.currentSession) {
+          this.currentVotingSession = {
+            id: response.currentSession.id,
+            taskId: response.currentSession.taskId,
+            status: response.currentSession.status,
+            votes: [],
+            createdAt: response.currentSession.createdAt,
+          };
+        }
+
+        this.isLoading = false;
+      });
+    } catch (err) {
+      runInAction(() => {
+        this.error = err instanceof Error ? err.message : 'Не удалось присоединиться к комнате';
+        this.isLoading = false;
+      });
+      throw err;
+    }
   }
 
   // Выйти из комнаты
   leaveRoom() {
+    if (this.currentRoom && this.currentUser) {
+      socketService.leaveRoom({
+        roomId: this.currentRoom.id,
+        userId: this.currentUser.id,
+      });
+    }
+
     runInAction(() => {
       this.currentRoom = null;
       this.currentUser = null;
-      storage.clearCurrentUser();
+      this.currentVotingSession = null;
+      this.votingHistory = [];
+      this.error = null;
     });
   }
 
-  // Создать сессию голосования
-  createVotingSession(taskId: string): void {
-    if (!this.currentRoom || !this.currentUser?.isOwner) return;
+  // Запустить голосование
+  startVoting(taskId: string) {
+    if (!this.currentRoom || !this.currentUser?.isOwner) {
+      throw new Error('Только owner может запускать голосование');
+    }
 
-    const session: VotingSession = {
-      id: uuidv4(),
+    socketService.startVoting({
+      roomId: this.currentRoom.id,
       taskId,
-      status: 'active',
-      votes: [],
-      createdAt: new Date(),
-    };
-
-    runInAction(() => {
-      if (this.currentRoom) {
-        this.currentRoom.currentVotingSession = session;
-        storage.saveRooms(this.rooms);
-      }
     });
   }
 
   // Проголосовать
-  vote(taskId: string, value: number | '?'): void {
+  vote(taskId: string, value: number | '?') {
     if (!this.currentRoom || !this.currentUser) return;
-    const session = this.currentRoom.currentVotingSession;
-    if (!session || session.taskId !== taskId) return;
 
-    runInAction(() => {
-      const existingVoteIndex = session.votes.findIndex(v => v.userId === this.currentUser!.id);
-      
-      const vote = {
-        userId: this.currentUser!.id,
-        userName: this.currentUser!.name,
-        value: value as any,
-      };
-
-      if (existingVoteIndex >= 0) {
-        session.votes[existingVoteIndex] = vote;
-      } else {
-        session.votes.push(vote);
-      }
-
-      storage.saveRooms(this.rooms);
+    socketService.castVote({
+      roomId: this.currentRoom.id,
+      taskId,
+      userId: this.currentUser.id,
+      userName: this.currentUser.name,
+      value,
     });
   }
 
-  // Завершить голосование и раскрыть результаты
-  completeVoting(): void {
-    if (!this.currentRoom || !this.currentUser?.isOwner) return;
-    const session = this.currentRoom.currentVotingSession;
-    if (!session || session.status !== 'active') return;
+  // Завершить голосование
+  completeVoting() {
+    if (!this.currentRoom || !this.currentUser?.isOwner) {
+      throw new Error('Только owner может завершать голосование');
+    }
 
-    runInAction(() => {
-      session.status = 'completed';
-      session.completedAt = new Date();
-      
-      // Подсчёт средней оценки (исключая '?')
-      const numericVotes = session.votes.filter(v => v.value !== '?').map(v => v.value as number);
-      if (numericVotes.length > 0) {
-        const sum = numericVotes.reduce((a, b) => a + b, 0);
-        const avg = sum / numericVotes.length;
-        // Округляем до ближайшего числа Фибоначчи
-        const fibSequence = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55];
-        session.finalEstimate = fibSequence.reduce((prev, curr) =>
-          Math.abs(curr - avg) < Math.abs(prev - avg) ? curr : prev
-        ) as any;
-      }
-
-      if (this.currentRoom) {
-        this.currentRoom.votingHistory.push(session);
-        this.currentRoom.currentVotingSession = undefined;
-        storage.saveRooms(this.rooms);
-      }
+    socketService.completeVoting({
+      roomId: this.currentRoom.id,
     });
+  }
+
+  // Проверить, проголосовал ли текущий пользователь
+  hasVoted(): boolean {
+    if (!this.currentVotingSession || !this.currentUser) return false;
+    return this.currentVotingSession.votes.some(v => v.userId === this.currentUser!.id);
+  }
+
+  // Получить ссылку для приглашения в комнату
+  getInviteLink(): string {
+    if (!this.currentRoom) return '';
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/room/${this.currentRoom.id}`;
   }
 }
 

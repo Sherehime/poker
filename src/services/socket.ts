@@ -1,0 +1,161 @@
+import { io, Socket } from 'socket.io-client';
+import type {
+  ServerToClientEvents,
+  ClientToServerEvents,
+  CreateRoomRequest,
+  CreateRoomResponse,
+  JoinRoomRequest,
+  JoinRoomResponse,
+  StartVotingRequest,
+  CastVoteRequest,
+  CompleteVotingRequest,
+} from '../../server/types.js';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+class SocketService {
+  private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+
+  // Подключение к серверу
+  connect() {
+    if (this.socket?.connected) {
+      return this.socket;
+    }
+
+    this.socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    this.socket.on('connect', () => {
+      console.log('🔌 Подключено к WebSocket серверу');
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('🔌 Отключено от WebSocket сервера:', reason);
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('❌ WebSocket ошибка:', error);
+    });
+
+    return this.socket;
+  }
+
+  // Отключение от сервера
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+  }
+
+  // Получить экземпляр сокета
+  getSocket() {
+    if (!this.socket) {
+      return this.connect();
+    }
+    return this.socket;
+  }
+
+  // Создание комнаты
+  createRoom(data: CreateRoomRequest): Promise<CreateRoomResponse> {
+    return new Promise((resolve, reject) => {
+      const socket = this.getSocket();
+      const socketWithAck = socket as any; // Temporarily bypass strict typing
+      socketWithAck.emit('room:create', data, (response: CreateRoomResponse | { error: string }) => {
+        if ('error' in response) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  // Вход в комнату
+  joinRoom(data: JoinRoomRequest): Promise<JoinRoomResponse> {
+    return new Promise((resolve, reject) => {
+      const socket = this.getSocket();
+      const socketWithAck = socket as any; // Temporarily bypass strict typing
+      socketWithAck.emit('room:join', data, (response: JoinRoomResponse | { error: string }) => {
+        if ('error' in response) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  // Выход из комнаты
+  leaveRoom(data: { roomId: string; userId: string }) {
+    const socket = this.getSocket();
+    socket.emit('room:leave', data);
+  }
+
+  // Запуск голосования
+  startVoting(data: StartVotingRequest) {
+    const socket = this.getSocket();
+    socket.emit('voting:start', data);
+  }
+
+  // Голосование
+  castVote(data: CastVoteRequest) {
+    const socket = this.getSocket();
+    socket.emit('vote:cast', data);
+  }
+
+  // Завершение голосования
+  completeVoting(data: CompleteVotingRequest) {
+    const socket = this.getSocket();
+    socket.emit('voting:complete', data);
+  }
+
+  // Подписка на события сервера
+
+  onRoomUpdated(callback: (room: any) => void) {
+    const socket = this.getSocket();
+    socket.on('room:updated', callback);
+  }
+
+  onParticipantJoined(callback: (participant: any) => void) {
+    const socket = this.getSocket();
+    socket.on('participant:joined', callback);
+  }
+
+  onVotingStarted(callback: (session: any) => void) {
+    const socket = this.getSocket();
+    socket.on('voting:started', callback);
+  }
+
+  onVoteReceived(callback: (vote: { userId: string; userName: string }) => void) {
+    const socket = this.getSocket();
+    socket.on('vote:received', callback);
+  }
+
+  onVotingCompleted(callback: (data: {
+    session: any;
+    votes: any[];
+    finalEstimate: number | '?';
+  }) => void) {
+    const socket = this.getSocket();
+    socket.on('voting:completed', callback);
+  }
+
+  onError(callback: (error: any) => void) {
+    const socket = this.getSocket();
+    socket.on('error', callback);
+  }
+
+  // Отписка от событий
+  removeAllListeners() {
+    const socket = this.getSocket();
+    socket.removeAllListeners();
+  }
+}
+
+// Экспорт singleton инстанса
+export const socketService = new SocketService();
